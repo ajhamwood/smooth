@@ -83,7 +83,7 @@ progress {
 #lifeSettings > input {
   display: none }
 #lifeSettings > label::before {
-  content: attr(for) ":\a0"}
+  content: attr(for) ":\a0" }
 #lifeSettings > input:checked + label {
   background: lightgrey }
 #lifeSettings > label {
@@ -155,15 +155,15 @@ progress {
       ><div id="speed"><span>Speed</span><span id="speed-val"></span><input type="text" id="speed-input" /></div
       ><input type="radio" id="birthStart" name="lifeSettings" checked /
       ><label for="birthStart"></label
-      ><input type="radio" id="birthEnd"name="lifeSettings"/
+      ><input type="radio" id="birthEnd" name="lifeSettings"/
       ><label for="birthEnd"></label
       ><input type="radio" id="deathStart" name="lifeSettings"/
       ><label for="deathStart"></label
       ><input type="radio" id="deathEnd" name="lifeSettings"/
       ><label for="deathEnd"></label
-      ><input type="radio" id="transitionFuzz"name="lifeSettings"/
+      ><input type="radio" id="transitionFuzz" name="lifeSettings"/
       ><label for="transitionFuzz"></label
-      ><input type="radio" id="existenceFuzz"name="lifeSettings"/
+      ><input type="radio" id="existenceFuzz" name="lifeSettings"/
       ><label for="existenceFuzz"></label
       ><div id="spray"><span>Spray</span><span id="spray-val"></span><input type="text" id="spray-input" /></div
       ><div id="pause">Resume</div
@@ -183,8 +183,17 @@ function $ (sel, node) { return Array.prototype.slice.call( (node || document).q
 $.addEvents = function (obj, node) {
   for (var q in obj) for (var e in obj[q])
     for (var ns = q ? $(q, node) : [window, document], es = e.split(" "), i = 0; i < es.length; i++)
-      typeof ns === "undefined" || ns.forEach(n => n.addEventListener(es[i], obj[q][e].bind(n)))
-};
+      typeof ns === "undefined" || ns.forEach(n => n.addEventListener(es[i], obj[q][e].bind(n))) };
+$.Local = (function () {
+  function Local (ns) { this._ns = ns }
+  Local.prototype = {
+    getItem: function (k) { return JSON.parse(localStorage.getItem(this._ns) || "{}")[k] },
+    setItem: function (k, v) { return localStorage.setItem(this._ns, JSON.stringify(Object.assign(JSON.parse(localStorage.getItem(this._ns) || "{}"), {[k]: v}))), v },
+    constructor: Local
+  };
+  return Local
+})();
+var local = new $.Local("smooth");
 
 function zeroArray (s) { return new Array(s).fill(0).map(() => new Array(s).fill(0)) }
 function resetLoop () {
@@ -197,9 +206,18 @@ function cancelEdit () {
 }
 
 var canvas = $("canvas")[0], context = canvas.getContext("2d"), recording = false, video,
-    loop, pause = true, size, logRes, magnification = 1, radius = 8, neighbourhood = 3,
-    birthStart = 0.318, birthEnd = 0.365, deathStart = 0.267, deathEnd = 0.445,
-    transitionFuzz = 0.028, existenceFuzz = 0.147, sprayDensity = .005, speed = .2;
+    loop, pause = true, size, logRes;
+var magnification = local.setItem("magnification", local.getItem("magnification") || 1),
+    radius = local.setItem("radius", local.getItem("radius") || 8),
+    neighbourhood = local.setItem("neighbourhood", local.getItem("neighbourhood") || 3),
+    birthStart = local.setItem("birthStart", local.getItem("birthStart") || 0.269),
+    birthEnd = local.setItem("birthEnd", local.getItem("birthEnd") || 0.289),
+    deathStart = local.setItem("deathStart", local.getItem("deathStart") || 0.228),
+    deathEnd = local.setItem("deathEnd", local.getItem("deathEnd") || 0.406),
+    transitionFuzz = local.setItem("transitionFuzz", local.getItem("transitionFuzz") || 0.028),
+    existenceFuzz = local.setItem("existenceFuzz", local.getItem("existenceFuzz") || 0.147),
+    spray = local.setItem("spray", local.getItem("spray") || 0.004),
+    speed = local.setItem("speed", local.getItem("speed") || 0.2);
 var fields, current_field;
 var M_re, M_im, N_re, N_im;
 
@@ -314,8 +332,8 @@ function fft2 (dir, x, y) {
   for (i = 0; i < size; i++) fft(dir, x[i], y[i])
 }
 
-function spray () {
-  for (var i = 0, cur_field = fields[0]; i < size * size * sprayDensity; i++) {
+function doSpray () {
+  for (var i = 0, cur_field = fields[0]; i < size * size * spray; i++) {
     var u = Math.floor(Math.random() * size),
         v = Math.floor(Math.random() * size), x, y;
     for (x = 0; x < radius; x++) for (y = 0; y < radius; y++) {
@@ -325,7 +343,7 @@ function spray () {
 }
 
 function loopInit () {
-  video = new Whammy.Video(15, .99);
+  video = new Whammy.Video(30, .99);
   fields = [zeroArray(size), zeroArray(size)];
   current_field = 0;
   var imaginary_field = zeroArray(size);
@@ -359,7 +377,7 @@ function loopInit () {
     return sigmoid2(n, lerp(birthStart, deathStart, alive), lerp(birthEnd, deathEnd, alive));
   }
 
-  spray();
+  doSpray();
 
   return function () {
     //Read in fields
@@ -390,7 +408,7 @@ function loopInit () {
     context.putImageData(imageData, 0, 0);
     if (recording) {
       video.add(canvas);
-      let f = video.frames.length, x = Math.floor(f/15) + ":" + f % 15;
+      let f = video.frames.length, x = Math.floor(f/30) + ":" + f % 30;
       $("#view")[0].innerText = $("#view")[0].innerText.replace(/(^\S+\s\S+).*/, "$1 (" + x + ")")
     }
 
@@ -406,7 +424,7 @@ $.addEvents({
         .forEach(t => $("#" + t + " + label")[0].innerText = window[t]);
       $("#slider > input")[0].value = window[$("#lifeSettings > input:checked")[0].id];
       $("#radius-val")[0].innerText  = $("#radius-input")[0].value = radius;
-      $("#spray-val")[0].innerText = $("#spray-input")[0].value = sprayDensity;
+      $("#spray-val")[0].innerText = $("#spray-input")[0].value = spray;
       $("#neighbourhood-val")[0].innerText = $("#neighbourhood-input")[0].value = neighbourhood;
       $("#speed-val")[0].innerText = $("#speed-input")[0].value = speed;
       if (document.createElement("canvas").toDataURL("image/webp").slice(11, 15) != "webp") $("#video")[0].classList.add("disable");
@@ -429,17 +447,18 @@ $.addEvents({
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         let checked = $("#lifeSettings > input:checked")[0];
-        checked.nextSibling.innerText = window[checked.id] = e.target.value;
+        checked.nextSibling.innerText = window[checked.id] = local.setItem(checked.id, parseFloat(e.target.value));
         resetLoop()
       }, 100)
     }
   },
+  "#lifeSettings > label": { click: function () { $("#slider > input")[0].focus() } },
   "#lifeSettings > input": {
     change: function () {
       $("#slider > input")[0].value = window[this.id]
     }
   },
-  "#spray > :first-child": { click: spray },
+  "#spray > :first-child": { click: doSpray },
   "#radius-val, #neighbourhood-val, #spray-val, #speed-val": {
     click: function () {
       this.parentNode.classList.add("edit");
@@ -450,9 +469,7 @@ $.addEvents({
     keypress: function (e) {
       var which = this.id.split("-")[0], v = {radius: parseInt, neighbourhood: parseFloat, spray: parseFloat, speed: parseFloat}[which](this.value);
       if (e.key == "Enter" && !isNaN(v) && v > 0) {
-        this.value =
-          this.previousSibling.innerText =
-          window[{radius: "radius", spray: "sprayDensity", neighbourhood: "neighbourhood", speed: "speed"}[which]] = v;
+        this.value = this.previousSibling.innerText = window[which] = local.setItem(which, v);
         this.parentNode.classList.remove("edit");
         refreshCanvas(true);
         resetLoop()
@@ -472,9 +489,9 @@ $.addEvents({
   "#mag-plus, #mag-minus": {
     click: function () {
       switch (this.id.split("-")[1]) {
-        case "plus": if (logRes > 2) magnification++; else return;
+        case "plus": if (logRes > 2) magnification = local.setItem("magnification", ++magnification); else return;
         break;
-        case "minus": if (magnification >= 0) magnification--; else return;
+        case "minus": if (magnification >= 0) magnification = local.setItem("magnification", --magnification); else return;
       }
       refreshCanvas();
       resetLoop()
@@ -484,7 +501,7 @@ $.addEvents({
     click: function () {
       switch (this.id.split("-")[0]) {
         case "start": this.parentNode.classList.add("record");
-        video = new Whammy.Video(15, .99);
+        video = new Whammy.Video(30, .99);
         video.add(canvas);
         recording = true
         break;
@@ -509,7 +526,7 @@ $.addEvents({
         case "View canvas":
         this.innerText = "View video";
         $("#content")[0].classList.remove("video", "loaded");
-        video = new Whammy.Video(15, .99);
+        video = new Whammy.Video(30, .99);
       }
     }
   }

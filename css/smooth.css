@@ -1,0 +1,133 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden }
+#content {
+  width: 100vh;
+  height: 100%;
+  margin-left: calc(50vw - 50vh);
+  display: flex;
+  position: relative }
+@media screen and (max-aspect-ratio: 1/1) {
+  #content {
+    height: 100vw;
+    width: 100%;
+    margin: calc(50vh - 50vw) 0 0 0 } }
+#content > :not(progress) {
+  width: 100%;
+  height: 100% }
+progress {
+  flex: 0 65%;
+  margin: auto }
+#content > :not(canvas),
+#content.video > canvas,
+#content.video.loaded > progress {
+  display: none }
+#content.video > progress,
+#content.video.loaded > video {
+  display: initial }
+
+#ui {
+  display: flex;
+  flex-flow: row nowrap;
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  background: rgba(128, 128, 128, .8);
+  text-align: center;
+  border-radius: .5rem;
+  padding: .5rem;
+  white-space: nowrap }
+#ui > * {
+  flex: 0 2rem }
+
+#settings {
+  color: white;
+  padding: 0 .2rem }
+#ui:not(.active):hover {
+  background: lightgrey;
+  cursor: pointer }
+#ui:not(.active):hover > #settings {
+  color: black }
+#ui > :not(#settings),
+#ui.active > #settings {
+  display: none }
+#ui.active > :not(#settings) {
+  display: block }
+
+#slider {
+  height: 23rem;
+  width: 2rem }
+#slider > input {
+  width: 23rem;
+  transform-origin: 11.5rem 11.5rem;
+  transform: rotate(-90deg);
+  position: absolute;
+  left: 0 }
+#slider > input::-moz-range-track {
+  background: white }
+
+#lifeSettings > input {
+  display: none }
+#lifeSettings > label::before {
+  content: attr(for) ":\a0" }
+#lifeSettings > input:checked + label {
+  background: lightgrey }
+#lifeSettings > label {
+  padding: .1rem .5rem;
+  margin: 0 .1rem;
+  cursor: pointer;
+  display: block }
+#speed > span, #neighbourhood > span, #radius > span, #spray > span,
+#pause, #magnify > span, #video > span, #fps > span, #renderer {
+  padding: .1rem .5rem;
+  margin: .5rem .2rem 0;
+  border-radius: .4rem;
+  background: lightgrey;
+  cursor: pointer }
+#radius, #neighbourhood, #speed {
+  margin-bottom: .5rem }
+#spray, #magnify, #video {
+  margin-top: .5rem }
+#video {
+  line-height: 1.75rem;
+  margin-top: .25rem }
+#renderer { margin-top: .25rem }
+#radius > span:not([id]),
+#neighbourhood > span:not([id]),
+#speed > span:not([id]),
+#magnify > span:not([id]),
+#fps > span:not([id]) {
+  cursor: default }
+#radius > #radius-val,
+#neighbourhood > #neighbourhood-val,
+#speed > #speed-val,
+#spray > #spray-val,
+#fps > #fps-val {
+  border-radius: 0 }
+#radius-input, .edit #radius-val,
+#neighbourhood-input, .edit #neighbourhood-val,
+#speed-input, .edit #speed-val,
+#spray-input, .edit #spray-val,
+#fps-input, .edit #fps-val,
+#stop-recording, .record #start-recording,
+:not(.disable) > #usechrome, .disable > :not(#usechrome) {
+  display: none }
+#fps { display: inline }
+.edit #radius-input, .edit #neighbourhood-input,
+.edit #spray-input, .edit #speed-input, .edit #fps-input {
+  display: initial;
+  width: 3rem;
+  margin: -.1rem .2rem;
+  border: 1px solid darkgrey;
+  padding: .1rem .3rem;
+  text-align: right }
+.record #stop-recording {
+  display: initial }
+.red {
+  color: #f00 }
+#video > #usechrome {
+  background: none;
+  color: lightgrey;
+  font-size: small;
+  cursor: default }

@@ -57,21 +57,23 @@
               (f32.load (i32.add (get_local $tbl_len) (i32.shl (i32.add (get_local $tmp3) (i32.const 1)) (i32.const 2))))
             ))
           ))
+          (set_local $tmp0re (f32.load (i32.add (get_local $reoff) (i32.shl (get_local $tmp2) (i32.const 2)))))
+          (set_local $tmp0im (f32.load (i32.add (get_local $imoff) (i32.shl (get_local $tmp2) (i32.const 2)))))
           (f32.store
             (i32.add (get_local $reoff) (i32.shl (get_local $tmp4) (i32.const 2)))
-            (f32.sub (f32.load (i32.add (get_local $reoff) (i32.shl (get_local $tmp2) (i32.const 2)))) (get_local $tmp1re))
+            (f32.sub (get_local $tmp0re) (get_local $tmp1re))
           )
           (f32.store
             (i32.add (get_local $imoff) (i32.shl (get_local $tmp4) (i32.const 2)))
-            (f32.sub (f32.load (i32.add (get_local $imoff) (i32.shl (get_local $tmp2) (i32.const 2)))) (get_local $tmp1im))
+            (f32.sub (get_local $tmp0im) (get_local $tmp1im))
           )
           (f32.store
             (i32.add (get_local $reoff) (i32.shl (get_local $tmp2) (i32.const 2)))
-            (f32.add (f32.load (i32.add (get_local $reoff) (i32.shl (get_local $tmp2) (i32.const 2)))) (get_local $tmp1re))
+            (f32.add (get_local $tmp0re) (get_local $tmp1re))
           )
           (f32.store
             (i32.add (get_local $imoff) (i32.shl (get_local $tmp2) (i32.const 2)))
-            (f32.add (f32.load (i32.add (get_local $imoff) (i32.shl (get_local $tmp2) (i32.const 2)))) (get_local $tmp1im))
+            (f32.add (get_local $tmp0im) (get_local $tmp1im))
           )
           (set_local $tmp2 (i32.add (get_local $tmp2) (i32.const 1)))
           (set_local $tmp3 (i32.add (get_local $tmp3) (get_local $tmp1)))

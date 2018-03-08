@@ -39,8 +39,9 @@ var magnification = local.setItem("magnification", setDefault("magnification", 1
     existenceFuzz = local.setItem("existenceFuzz", setDefault("existenceFuzz", .147)),
     spray = local.setItem("spray", setDefault("spray", .4)),
     speed = local.setItem("speed", setDefault("speed", .2)),
-    fps = local.setItem("fps", setDefault("fps", 30))
-var canvas = $("canvas")[0], context = canvas.getContext("2d"), recording = false, video,
+    fps = local.setItem("fps", setDefault("fps", 30)),
+
+    canvas = $("canvas")[0], context = canvas.getContext("2d"), recording = false, video,
     loop, pause = true, size, fields, current_field, M_re, M_im, N_re, N_im;
 
 function refreshCanvas (update) {
@@ -89,13 +90,12 @@ function refreshCanvas (update) {
 }
 
 //FFT
-var test2 = true;
-var fft_instance, memory, bit_reversed, trig_tables, mem_re, mem_im, bpe = 4; // Change for f64
+var fft_instance, memory, bit_reversed, trig_tables, mem_re, mem_im, bpe = 4;
 
 function fft_init (n) {
   return new Promise(resolve => {
     let wasmAwait = resolve, offset = x => 2 * n * bpe + x * bpe;
-    if ("WebAssembly" in window && test2) {
+    if ("WebAssembly" in window) {
       if (!fft_instance) {
         wasmAwait = () => {};
         memory = new WebAssembly.Memory({initial: 1});
@@ -124,7 +124,7 @@ function fft_init (n) {
 function fft (dir, re, im) {
   var n = re.length;
   if (n < 4 || n > Number.MAX_SAFE_INTEGER || n & (n-1) != 0) return null;
-  if ("WebAssembly" in window && test2) {
+  if ("WebAssembly" in window) {
     mem_re.set(re, 0);
     mem_im.set(im, 0);
     fft_instance(n, dir);
@@ -133,7 +133,7 @@ function fft (dir, re, im) {
   } else {
     var levels, i, j, tmp, tmp2, s, step, k, l;
     // Bit-reversed addressing permutation
-    for (i = 1, j, tmp; i < n - 1; i++) {
+    for (i = 1; i < n - 1; i++) {
       j = bit_reversed[i];
       if (j > i) {
         tmp = re[i]; re[i] = re[j]; re[j] = tmp;
@@ -224,15 +224,15 @@ function loopInit () {
     fft2(-1, N_re_buffer, N_im_buffer);
 
     //Step s
-    for (i = 0; i < size; i++) for (j = 0; j < size; j++) next_field[i*size + j] = lerp(keep[i*size + j], S(N_re_buffer[i*size + j], M_re_buffer[i*size + j]), speed);
+    for (i = 0; i < size; i++) for (j = 0; j < size; j++)
+      next_field[i*size + j] = lerp(keep[i*size + j], S(N_re_buffer[i*size + j], M_re_buffer[i*size + j]), speed);
 
     //Extract image data
     var imageData = context.createImageData(size, size), buf = new ArrayBuffer(imageData.data.length),
-        buf8 = new Uint8ClampedArray(buf), data = new Uint32Array(buf)
+        buf8 = new Uint8ClampedArray(buf), data = new Uint32Array(buf),
         ptr = 0;
-    for (i = 0; i < size; i++) for (j = 0; j < size; j++) {
-      data[ptr++] = Math.max(0, Math.min(255, Math.floor(256 * next_field[i*size + j]))) * 65793 - 16777216
-    }
+    for (i = 0; i < size; i++) for (j = 0; j < size; j++)
+      data[ptr++] = Math.max(0, Math.min(255, Math.floor(256 * next_field[i*size + j]))) * 65793 - 16777216;
     imageData.data.set(buf8);
     context.putImageData(imageData, 0, 0);
     if (recording) {

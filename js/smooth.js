@@ -14,7 +14,7 @@ $.Local = (function () {
 })();
 var local = new $.Local("smooth");
 
-function zeroArray (s) { return new Float32Array(new ArrayBuffer(s*s*4)).fill(0) }
+function zeroArray (s) { return new Float32Array(s*s).fill(0) }
 function resetLoop () {
   loop = () => false;
   requestAnimationFrame(() => (loop = loopInit())())
@@ -91,7 +91,7 @@ function refreshCanvas (update) {
 
 //FFT
 var fft_instance, memory, bit_reversed, trig_tables, mem_re, mem_im, bpe = 4;
-
+var bye;
 function fft_init (n) {
   return new Promise(resolve => {
     let wasmAwait = resolve, offset = x => 2 * n * bpe + x * bpe;
@@ -102,7 +102,7 @@ function fft_init (n) {
         //WebAssembly.instantiateStreaming(fetch('wasm/fft.wasm'), importObj).then(results => { //application/wasm
         fetch('wasm/fft.wasm', {mode: "no-cors"})
           .then(response => response.arrayBuffer())
-          .then(bytes => WebAssembly.instantiate(bytes, {js: {memory}}))
+          .then(bytes => {bye = bytes; return WebAssembly.instantiate(bytes, {js: {memory}})})
           .then(results => resolve(fft_instance = results.instance.exports.fft));
       } else new Uint32Array(memory.buffer).fill(0)
     } else memory = new ArrayBuffer(4 * n * bpe);
@@ -252,7 +252,7 @@ $.addEvents({
       ["birthStart", "birthEnd", "deathStart", "deathEnd", "transitionFuzz", "existenceFuzz"]
         .forEach(t => $("#" + t + " + label")[0].innerText = window[t]);
       $("#slider > input")[0].value = window[$("#lifeSettings > input:checked")[0].id];
-      $("#radius-val")[0].innerText  = $("#radius-input")[0].value = radius;
+      $("#radius-val")[0].innerText = $("#radius-input")[0].value = radius;
       $("#spray-val")[0].innerText = $("#spray-input")[0].value = spray;
       $("#neighbourhood-val")[0].innerText = $("#neighbourhood-input")[0].value = neighbourhood;
       $("#speed-val")[0].innerText = $("#speed-input")[0].value = speed;

@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+  <title>Smoothtest</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="keywords" content="key, words">
+  <meta name="description" content="Description.">
+  <link rel="shortcut icon" href="data:image/png;base64,">
+  <style>
+html, body {
+  margin: 0
+}
+  </style>
+</head>
+<body>
+  <div id="test"></div>
+  <script>
+
+(ctx => {
+  var bpe = 4, n = 256, fft_instance, bit_reversed, trig_tables, mem_re, mem_im;
+  ctx.setup0 = function () {
+    var memory = new WebAssembly.Memory({initial: 1});
+    return fetch('wasm/fft.wasm', {mode: "no-cors"})
+      .then(response => response.arrayBuffer())
+      .then(bytes => {bye = bytes; return WebAssembly.instantiate(bytes, {js: {memory}})})
+      .then(results => fft_instance = results.instance.exports.fft)
+      .then(() => completeSetup(memory))
+  }
+
+  ctx.setup1 = function () {
+    var memory = new ArrayBuffer(4 * n * bpe);
+    return completeSetup(memory)
+  }
+
+  function completeSetup (memory) {
+    function randomArray (n) { return new Float32Array(256).fill(0).map(x => Math.random()) }
+    var mb = memory.buffer || memory, levels = 0,
+        offset = x => 2 * n * bpe + x * bpe;
+    bit_reversed = new Uint32Array(mb, 0, n);
+    for (let m = n; m > 1; m >>= 1) levels++;
+    for (let i = 0; i < n; i++)
+      for (let x = i, j = 0; j < levels; j++, x >>= 1) bit_reversed[i] = (bit_reversed[i] << 1) | (x & 1);
+    trig_tables = new Float32Array(mb, n * bpe, n);
+    for (let i = 0; i < n; i++) trig_tables[i] = i % 2 ?
+      Math.sin(Math.PI * (i - 1) / n):
+      Math.cos(Math.PI * i / n);
+    mem_re = new Float32Array(mb, offset(0), n);
+    mem_im = new Float32Array(mb, offset(n), n);
+
+    var dir = -1, re = randomArray(256), im = randomArray(256);
+    return {fft_instance, memory, bit_reversed, trig_tables, mem_re, mem_im, dir, re, im, n}
+  }
+})(window);
+
+(ctx => {
+  ctx.test0 = function () {
+    mem_re.set(re, 0);
+    mem_im.set(im, 0);
+    fft_instance(n, dir);
+    re.set(mem_re, 0);
+    im.set(mem_im, 0)
+  }
+
+  ctx.test1 = function () {
+    var levels, i, j, tmp, tmp2, s, step, k, l;
+    // Bit-reversed addressing permutation
+    for (i = 1; i < n - 1; i++) {
+      j = bit_reversed[i];
+      if (j > i) {
+        tmp = re[i]; re[i] = re[j]; re[j] = tmp;
+        tmp = im[i]; im[i] = im[j]; im[j] = tmp;
+      }
+    }
+    // Cooley-Tukey decimation-in-time radix-2 FFT
+    for (s = 1; s < n; s <<= 1) {
+      step = n / s;
+      for (i = 0; i < n; i += s << 1) {
+        for (j = i, k = 0; j < i + s; j++, k += step) {
+          l = j + s;
+          tmp = re[l] * trig_tables[k] + dir * im[l] * trig_tables[k + 1];
+          tmp2 = im[l] * trig_tables[k] - dir * re[l] * trig_tables[k + 1];
+          re[l] = re[j] - tmp; im[l] = im[j] - tmp2;
+          re[j] += tmp; im[j] += tmp2;
+        }
+      }
+    }
+    // Scaling for forward transform
+    if (dir == -1) for (i = 0; i < n; i++) { re[i] /= n; im[i] /= n }
+  }
+})(window);
+
+perf({
+  setup: [setup0, setup1],
+  test: [test0, test1],
+  until: {seconds: 5}
+});
+
+function perf (obj) {
+  if ("test" in obj) {
+    let tests = obj.test;
+    return new Promise(resolve => {
+      if ("setup" in obj) Promise.all(obj.setup.map(x => x())).then(resolve)
+    }).then(locals => {
+      if ("until" in obj) {
+        function testloop (n, i) {
+          for (var v in locals[n]) this["ns" + v] = locals[n][v];
+          performance.mark(n + " " + i)
+          obj.test[n]();
+          for (var v in locals[n]) delete this["ns" + v];
+        };
+        if ("seconds" in obj.until) {
+          performance.mark("begin-all");
+          for (let n = 0, i; n < obj.test.length; i = 0, n++) while (i++, performance.something) testloop(n, i)
+        } else if ("times" in obj.until) {
+          //while () {}
+        } else return false
+      } else return false
+    })
+  } else return false
+}
+
+/*var Perf = (function () {
+  function Perf () {}
+  Perf.prototype = {
+    run:
+    constructor: Perf
+  }
+  return Perf
+}), perf = new Perf();*/
+
+  </script>
+</body>
+</html>

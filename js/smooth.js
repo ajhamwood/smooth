@@ -14,7 +14,7 @@ $.Local = (function () {
 })();
 var local = new $.Local("smooth");
 
-function zeroArray (s) { return new Float32Array(new ArrayBuffer(s*s*4)).fill(0) }
+function zeroArray (s) { return new Float32Array(s*s).fill(0) }
 function resetLoop () {
   loop = () => false;
   requestAnimationFrame(() => (loop = loopInit())())
@@ -91,10 +91,9 @@ function refreshCanvas (update) {
 
 //FFT
 var fft_instance, memory, bit_reversed, trig_tables, mem_re, mem_im, bpe = 4;
-
 function fft_init (n) {
   return new Promise(resolve => {
-    let wasmAwait = resolve, offset = x => 2 * n * bpe + x * bpe;
+    let wasmAwait = resolve;
     if ("WebAssembly" in window) {
       if (!fft_instance) {
         wasmAwait = () => {};
@@ -115,8 +114,8 @@ function fft_init (n) {
     for (let i = 0; i < n; i++) trig_tables[i] = i % 2 ?
       Math.sin(Math.PI * (i - 1) / n):
       Math.cos(Math.PI * i / n);
-    mem_re = new Float32Array(mb, offset(0), n);
-    mem_im = new Float32Array(mb, offset(n), n);
+    mem_re = new Float32Array(mb, 2 * n * bpe, n);
+    mem_im = new Float32Array(mb, 3 * n * bpe, n);
     wasmAwait()
   })
 }
@@ -252,7 +251,7 @@ $.addEvents({
       ["birthStart", "birthEnd", "deathStart", "deathEnd", "transitionFuzz", "existenceFuzz"]
         .forEach(t => $("#" + t + " + label")[0].innerText = window[t]);
       $("#slider > input")[0].value = window[$("#lifeSettings > input:checked")[0].id];
-      $("#radius-val")[0].innerText  = $("#radius-input")[0].value = radius;
+      $("#radius-val")[0].innerText = $("#radius-input")[0].value = radius;
       $("#spray-val")[0].innerText = $("#spray-input")[0].value = spray;
       $("#neighbourhood-val")[0].innerText = $("#neighbourhood-input")[0].value = neighbourhood;
       $("#speed-val")[0].innerText = $("#speed-input")[0].value = speed;

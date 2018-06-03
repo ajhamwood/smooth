@@ -1,0 +1,278 @@
+<!doctype html>
+<html>
+<head>
+  <title>FFT Benchmark</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="keywords" content="benchmark, fft, fast fourier transform, WebAssembly, wasm">
+  <meta name="description" content="Benchmarking WebAssembly versus native Javascript implementations of the Fast Fourier Transform.">
+  <link rel="shortcut icon" href="data:image/png;base64,">
+  <style>
+html, body { margin: .5rem 2rem }
+h1 {
+  text-align: center;
+  font: bold italic xx-large sans }
+.table {
+  margin-bottom: 2rem;
+  max-width: 60rem }
+  .row { display: table-row }
+    .row > * {
+      display: table-cell;
+      padding: .5rem;
+      border-right: 3px solid white;
+      width: 25vw }
+    .row:first-child > div {
+      font-weight: bold;
+      text-align: center }
+    .row:nth-child(n+2) > div { text-align: right }
+    .row > div:first-child { text-align: left }
+    .row:nth-child(even) > * { background: #eee }
+    .row:nth-child(n+2) > div:nth-child(n+2)::after { content: " ops/sec" }
+@media (max-width: 800px) {
+  .table {
+    margin: 0 auto 2rem;
+    max-width: 20rem }
+    .row:first-child { display: none }
+    .row { position: relative }
+    .row, .row > * {
+      display: block;
+      width: auto }
+      .row > div:first-child { padding: .8rem 1.5rem .3rem }
+      .row > div:nth-child(n+2)::before {
+        position: absolute;
+        left: .5rem;
+        font-weight: bold }
+      .row > div:nth-child(2)::before { content: "wasm:" }
+      .row > div:nth-child(3)::before { content: "JS:" }
+      .row > div:nth-child(4)::before { content: "(control):" } }
+  </style>
+</head>
+<body>
+  <h1>Fast Fourier Transform - WebAssembly vs native JS performance</h1>
+  <div class="table">
+    <div class="row"><div></div><div>wasm</div><div>JS</div><div>(control)</div></div>
+    <div class="row"><div>1&nbsp;sec</div><div></div><div></div><div></div></div>
+    <div class="row"><div>3&nbsp;sec</div><div></div><div></div><div></div></div>
+    <div class="row"><div>10&nbsp;sec</div><div></div><div></div><div></div></div>
+  </div>
+  <button class="run">Run benchmark again</button>
+  <button class="abort">Abort current benchmark</button>
+  <script>
+// Utilities
+function $(sel, node) { return Array.prototype.slice.call( (node || document).querySelectorAll(sel) ) }
+$.addEvents = function (obj, node) {
+  for (var q in obj) for (var e in obj[q])
+    for (var ns = q ? $(q, node) : [window, document], es = e.split(' '), i = 0; i < es.length; i++)
+      typeof ns === 'undefined' || ns.forEach(n => n.addEventListener(es[i], obj[q][e].bind(n))) };
+
+// Pre-benchmarking setup
+(ctx => {
+  var bpe = 4, n = 256, fft_instance, bit_reversed, trig_tables, mem_re, mem_im;
+
+  ctx.setupWasm = function () {
+    var memory = new WebAssembly.Memory({initial: 1});
+    return fetch('wasm/fft.wasm', {mode: "no-cors"})
+      .then(response => response.arrayBuffer())
+      .then(bytes => WebAssembly.instantiate(bytes, {js: {memory}}))
+      .then(results => fft_instance = results.instance.exports.fft)
+      .then(() => completeSetup(memory))
+  };
+
+  ctx.setupJS = function () {
+    var memory = new ArrayBuffer(4 * n * bpe);
+    return completeSetup(memory)
+  }
+
+  function completeSetup (memory) {
+    var mb = memory.buffer || memory, levels = 0;
+    bit_reversed = new Uint32Array(mb, 0, n);
+    for (let m = n; m > 1; m >>= 1) levels++;
+    for (let i = 0; i < n; i++)
+      for (let x = i, j = 0; j < levels; j++, x >>= 1) bit_reversed[i] = (bit_reversed[i] << 1) | (x & 1);
+    trig_tables = new Float32Array(mb, n * bpe, n);
+    for (let i = 0; i < n; i++) trig_tables[i] = i % 2 ?
+      Math.sin(Math.PI * (i - 1) / n):
+      Math.cos(Math.PI * i / n);
+    mem_re = new Float32Array(mb, 2 * n * bpe, n);
+    mem_im = new Float32Array(mb, 3 * n * bpe, n);
+
+    var dir = -1;
+    return {fft_instance, memory, bit_reversed, trig_tables, mem_re, mem_im, dir, n}
+  }
+})(window);
+
+// Benchmarked code
+(ctx => {
+  function randomArray (n) { return new Float32Array(n).fill(0).map(x => Math.random()) }
+
+  ctx.control = function () {
+    re = randomArray(256);
+    im = randomArray(256)
+  };
+
+  ctx.testWasm = function () {
+    ctx.control();
+    mem_re.set(re, 0);
+    mem_im.set(im, 0);
+    fft_instance(n, dir);
+    re.set(mem_re, 0);
+    im.set(mem_im, 0)
+  };
+
+  ctx.testJS = function () {
+    ctx.control();
+    var levels, i, j, tmp, tmp2, s, step, k, l;
+    // Bit-reversed addressing permutation
+    for (i = 1; i < n - 1; i++) {
+      j = bit_reversed[i];
+      if (j > i) {
+        tmp = re[i]; re[i] = re[j]; re[j] = tmp;
+        tmp = im[i]; im[i] = im[j]; im[j] = tmp;
+      }
+    }
+    // Cooley-Tukey decimation-in-time radix-2 FFT
+    for (s = 1; s < n; s <<= 1) {
+      step = n / s;
+      for (i = 0; i < n; i += s << 1) {
+        for (j = i, k = 0; j < i + s; j++, k += step) {
+          l = j + s;
+          tmp = re[l] * trig_tables[k] + dir * im[l] * trig_tables[k + 1];
+          tmp2 = im[l] * trig_tables[k] - dir * re[l] * trig_tables[k + 1];
+          re[l] = re[j] - tmp; im[l] = im[j] - tmp2;
+          re[j] += tmp; im[j] += tmp2;
+        }
+      }
+    }
+    // Scaling for forward transform
+    if (dir == -1) for (i = 0; i < n; i++) { re[i] /= n; im[i] /= n }
+  }
+})(window);
+
+// Benchmarking object
+var Performator = function (opt) {
+  var _ = {
+    // Event emitter
+    events: [],
+    on (e, fn) { (_.events[e] = _.events[e] || []).push(fn) },
+    emit (e, ...args) { _.events[e] && _.events[e].forEach(fn => fn.apply(this, args)) },
+    stop (e, fname = "") { _.events[e] && _.events[e].splice(_.events[e].findIndex(fn => fn.name == fname), 1) },
+
+    throttlingRate: (t => t < .99 && t > 0 ? 1 / (1 - t) : 1.2)(opt.throttlingRate),
+    blockDuration: opt.blockDuration || 200,
+    abort: false
+  };
+
+  // Minimally-scoped testing function
+  function testloop ({n, i, reps, locals, test}) {
+    for (let v in locals) this[v] = locals[v];
+    performance.mark([n, i, "+"]);
+    for (let times = 0; times < reps; times++) test();
+    performance.mark([n, i, "-"]);
+    performance.measure([n, i, "M"], [n, i, "+"], [n, i, "-"])
+  }
+
+  Object.assign(this, {
+
+    // Start a benchmark
+    run (obj) {
+      if ("test" in obj && "until" in obj) {
+        let tests = obj.test, until = obj.until;
+        obj.stats = [];
+        if (_.abort) return (console.log('Aborted'), Promise.resolve(obj));
+        performance.mark("begin-all");
+
+        // Run each test in order
+        return (function seqTests (n) {
+          if (n >= tests.length) return obj;
+          let i = 0, reps = 1, test = tests[n];
+
+          // Run setup
+          return new Promise(r => r(obj.setup[n]())).catch(() => {}).then(locals => {
+
+            // Measurement loop
+            performance.mark("begin-all");
+            let tot = 0;
+            return (function throttle () {
+              testloop({n, i, reps, locals, test});
+
+              if (i == 0 && performance.getEntriesByName([n, 0, "M"])[0].duration < _.blockDuration) {
+                reps *= 2;
+                performance.clearMarks();
+                performance.clearMeasures();
+                performance.mark("begin-all");
+                return throttle()
+              }
+              performance.clearMarks("now");
+              performance.clearMeasures("now M");
+              performance.mark("now");
+              performance.measure("now M", "begin-all", "now");
+              tot += performance.getEntriesByName([n, i, "M"])[0].duration;
+              _.emit("progress", {
+                testIndex: n,
+                ops: ++i * reps,
+                duration: tot / 1000
+              });
+              if (_.abort) throw 'Aborted';
+              if (
+                "seconds" in until && performance.getEntriesByName("now M")[0].duration < (until.seconds[n] || until.seconds) * 1000 * _.throttlingRate ||
+                "times" in until && i * reps < (until.times[n] || until.times)
+              ) return new Promise(r => setTimeout(r, _.blockDuration * (_.throttlingRate - 1))).then(throttle);
+            })()
+
+            // Collate data
+            .then(() => {
+              performance.clearMeasures("now M");
+              let stats = {
+                    ops: i * reps,
+                    duration: tot / 1000,
+                    average: tot / (i * reps)
+                  };
+              _.emit("benchmark", Object.assign({testIndex: n}, stats));
+              obj.stats[n] = stats;
+              performance.clearMarks();
+              performance.clearMeasures()
+            })
+          }).then(() => seqTests(n + 1)).catch(e => (console.log(e), obj)) // go to next test
+        })(0) // end test sequencer
+      } else return false;
+    },
+    abort () { _.abort = true }
+  });
+
+  // Benchmarking events
+  return Object.defineProperties(this, {
+    onprogress: {
+      set (fn) { _.stop("progress"); _.on("progress", fn) },
+      get () { return _.events["progress"] }
+    },
+    onbenchmark: {
+      set (fn) { _.stop("benchmark"); _.on("benchmark", fn) },
+      get () { return _.events["benchmark"] }
+    }
+  })
+}
+var perf = new Performator({throttlingRate: .5, blockDuration: 200});
+
+$.addEvents({
+  "": {
+    load: () => [1, 3, 10].reduce((acc, x, i) => acc.then(() => new Promise(resolve => {
+      perf.onprogress = perf.onbenchmark = e =>
+        $(`.row:nth-child(${i+2}) > div`)[e.testIndex+1].innerText = parseFloat((e.ops / e.duration).toPrecision(4));
+      perf.run({
+        setup: [setupWasm, setupJS],
+        test: [testWasm, testJS, control],
+        until: {seconds: x}
+      }).then(resolve)
+    })), Promise.resolve($("button")[0].disabled = true)).then(() => $("button")[0].disabled = false)
+  },
+  ".run": { click: () => {
+    $(".row:nth-child(n+2) > div:nth-child(n+2)").forEach(n => n.innerText = "");
+    perf = new Performator({throttlingRate: .5, blockDuration: 200});
+    window.dispatchEvent(new Event("load"))
+  }},
+  ".abort": { click: () => perf.abort() }
+})
+
+  </script>
+</body>
+</html>

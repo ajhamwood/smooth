@@ -91,10 +91,9 @@ function refreshCanvas (update) {
 
 //FFT
 var fft_instance, memory, bit_reversed, trig_tables, mem_re, mem_im, bpe = 4;
-var bye;
 function fft_init (n) {
   return new Promise(resolve => {
-    let wasmAwait = resolve, offset = x => 2 * n * bpe + x * bpe;
+    let wasmAwait = resolve;
     if ("WebAssembly" in window) {
       if (!fft_instance) {
         wasmAwait = () => {};
@@ -102,7 +101,7 @@ function fft_init (n) {
         //WebAssembly.instantiateStreaming(fetch('wasm/fft.wasm'), importObj).then(results => { //application/wasm
         fetch('wasm/fft.wasm', {mode: "no-cors"})
           .then(response => response.arrayBuffer())
-          .then(bytes => {bye = bytes; return WebAssembly.instantiate(bytes, {js: {memory}})})
+          .then(bytes => WebAssembly.instantiate(bytes, {js: {memory}}))
           .then(results => resolve(fft_instance = results.instance.exports.fft));
       } else new Uint32Array(memory.buffer).fill(0)
     } else memory = new ArrayBuffer(4 * n * bpe);
@@ -115,8 +114,8 @@ function fft_init (n) {
     for (let i = 0; i < n; i++) trig_tables[i] = i % 2 ?
       Math.sin(Math.PI * (i - 1) / n):
       Math.cos(Math.PI * i / n);
-    mem_re = new Float32Array(mb, offset(0), n);
-    mem_im = new Float32Array(mb, offset(n), n);
+    mem_re = new Float32Array(mb, 2 * n * bpe, n);
+    mem_im = new Float32Array(mb, 3 * n * bpe, n);
     wasmAwait()
   })
 }

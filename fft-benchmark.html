@@ -165,10 +165,10 @@ var Performator = function (opt) {
   // Minimally-scoped testing function
   function testloop ({n, i, reps, locals, test}) {
     for (let v in locals) this[v] = locals[v];
-    performance.mark([n, i, "+"]);
+    performance.mark(`${n},${i},+`);
     for (let times = 0; times < reps; times++) test();
-    performance.mark([n, i, "-"]);
-    performance.measure([n, i, "M"], [n, i, "+"], [n, i, "-"])
+    performance.mark(`${n},${i},-`);
+    performance.measure(`${n},${i},M`, `${n},${i},+`, `${n},${i},-`)
   }
 
   Object.assign(this, {
@@ -195,7 +195,7 @@ var Performator = function (opt) {
             return (function throttle () {
               testloop({n, i, reps, locals, test});
 
-              if (i == 0 && performance.getEntriesByName([n, 0, "M"])[0].duration < _.blockDuration) {
+              if (i == 0 && performance.getEntriesByName(`${n},0,M`)[0].duration < _.blockDuration) {
                 reps *= 2;
                 performance.clearMarks();
                 performance.clearMeasures();
@@ -206,7 +206,7 @@ var Performator = function (opt) {
               performance.clearMeasures("now M");
               performance.mark("now");
               performance.measure("now M", "begin-all", "now");
-              tot += performance.getEntriesByName([n, i, "M"])[0].duration;
+              tot += performance.getEntriesByName(`${n},${i},M`)[0].duration;
               _.emit("progress", {
                 testIndex: n,
                 ops: ++i * reps,

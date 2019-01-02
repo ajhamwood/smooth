@@ -98,7 +98,7 @@ function fft_init (n) {
       if (!fft_instance) {
         wasmAwait = () => {};
         memory = new WebAssembly.Memory({initial: 1});
-        //WebAssembly.instantiateStreaming(fetch('wasm/fft.wasm'), importObj).then(results => { //application/wasm
+        //WebAssembly.instantiateStreaming(fetch('wasm/fft.wasm', {mode: "no-cors"}), {js: {memory}}).then(results => { //must respond with mimetype: application/wasm
         fetch('wasm/fft.wasm', {mode: "no-cors"})
           .then(response => response.arrayBuffer())
           .then(bytes => WebAssembly.instantiate(bytes, {js: {memory}}))
